@@ -9,7 +9,7 @@
       />
     </section>
     <a-menu theme="dark" mode="inline" :default-selected-keys="[menus[0].id]">
-      <a-menu-item v-for="menu in menus" :key="menu.id">
+      <a-menu-item v-for="menu in menus" :key="menu.id" v-on:click="clickMenuItem(menu)">
         <a-icon :type="menu.icon" />
         <span>{{ menu.title }}</span>
       </a-menu-item>
@@ -26,19 +26,24 @@ export default {
         {
           id: 1,
           icon: 'unordered-list',
-          route: '/graph/list',
+          url: '/graph/list',
           title: '数据集列表',
         },
         {
           id: 2,
           icon: 'setting',
-          route: '/modal/manage',
+          url: '/modal/manage',
           title: '模型管理',
         },
       ]
     };
   },
   name: "Sidebar",
+  methods: {
+    clickMenuItem(menu) {
+      this.$router.push(menu.url);
+    }
+  }
   
 };
 </script>

@@ -1,7 +1,16 @@
 <template>
   <div class="graph-list">
     <div class="table-operator">
-      <a-button type="primary" icon="plus" @click="handleAdd">添加</a-button>
+      <a-button-group>
+        <a-button type="primary" icon="plus" @click="handleAdd">添加</a-button>
+        <a-button
+          type="primary"
+          icon="reload"
+          @click="handleRefresh"
+          :loading="tableConfirmLoading"
+          >刷新</a-button
+        >
+      </a-button-group>
     </div>
 
     <a-spin :spinning="tableConfirmLoading">
@@ -23,7 +32,7 @@
         />
         <a-table-column key="status" title="分析状态" data-index="status">
           <template slot-scope="status">
-            <a-tag :color="color[status]">
+            <a-tag :color="status | statusColor">
               {{ status }}
             </a-tag>
           </template>
@@ -36,8 +45,10 @@
         <a-table-column key="action" title="操作">
           <template slot-scope="data">
             <span style="display:none">{{ data.id }}</span>
-            <span>
-              <a v-on:click="handleDelete(data.id)">删除</a>
+            <span>              
+              <a-button v-on:click="handleDelete(data.id)" icon="delete" type="danger" size="small" ghost>
+                删除
+              </a-button>
             </span>
           </template>
         </a-table-column>
@@ -74,7 +85,11 @@
       @cancel="detailModalCancel"
     >
       <a-spin :spinning="detailModalConfirmLoading">
-        <GraphDetail v-if="showDetailContent" ref="graphDetail" :graphDetail="graphDetail" />
+        <GraphDetail
+          v-if="showDetailContent"
+          ref="graphDetail"
+          :graphDetail="graphDetail"
+        />
       </a-spin>
     </a-modal>
   </div>
@@ -101,14 +116,30 @@ import GraphDetail from "./GraphDetail.vue";
 const Mocks = {
   GraphList: [
     {
-      id: "1",
-      key: "1",
-      name: "Cora",
+      id: "0000000", //string
+      name: "Cora", //string
       description:
-        "包含七个不同领域论文，通过论文引用构成图，用于论文自动化归类",
-      uploadTime: "2021-03-13 21:00:00",
-      status: "分析完成",
-      analysisCompleteTime: "2021-03-13 21:10:25",
+        "包含七个不同领域论文，通过论文引用构成图，用于论文自动化归类", //string
+      uploadTime: "2021-03-16 19:58:11",
+      sourceFileUrl: "data/0000000/data.npz", //string
+      status: "分析完成", //string
+      analysisCompleteTime: "2021-03-16 20:49:36", //string|(YYYY-MM-DD hh:mm:ss) || null
+      dataGraphDistribution: "298,418,818,426,217,180,351", //string  节点数据分布
+      dataGraphNumber: "2485", //string  节点数量
+      dataFeatureDimension: "1433", //string  特征纬度
+      reshapedGraph: "data/0000000/reshapedGraph.npy", // string  重构图
+
+      gcnResult: "0.6831", //string  准确率
+      gcnImageUrl: Origin, //string  节点表示分布图
+      gcnFileUrl: "gcn_pred.npy", //string  预测结果文件
+
+      graphReshapeResult: "0.8011", //string
+      graphReshapeImageUrl: Reshaped, //string
+      graphReshapeFileUrl: "data/0000000/graphreshape_pred.npy", //string
+
+      gsnnResult: "0.8176", //string
+      gsnnImageUrl: gsnn, //string
+      gsnnFileUrl: "data/0000000/gsnn_pred.npy", // url string
     },
     {
       id: "2",
@@ -147,31 +178,13 @@ const Mocks = {
       analysisCompleteTime: null,
     },
   ],
-  GraphDetail: {
-    id: "0000000", //string
-    name: "Cora", //string
-    description: "包含七个不同领域论文，通过论文引用构成图，用于论文自动化归类", //string
-    uploadTime: "2021-03-16 19:58:11",
-    sourceFileUrl: "data/0000000/data.npz", //string
-    status: "分析完成", //string
-    analysisCompleteTime: "2021-03-16 20:49:36", //string|(YYYY-MM-DD hh:mm:ss) || null
-    dataGraphDistribution: "298,418,818,426,217,180,351", //string  节点数据分布
-    dataGraphNumber: "2485", //string  节点数量
-    dataFeatureDimension: "1433", //string  特征纬度
-    reshapedGraph: "data/0000000/reshapedGraph.npy", // string  重构图
+};
 
-    gcnResult: "0.6831", //string  准确率
-    gcnImageUrl: Origin, //string  节点表示分布图
-    gcnFileUrl: "gcn_pred.npy", //string  预测结果文件
-
-    graphReshapeResult: "0.8011", //string
-    graphReshapeImageUrl: Reshaped, //string
-    graphReshapeFileUrl: "data/0000000/graphreshape_pred.npy", //string
-
-    gsnnResult: "0.8176", //string
-    gsnnImageUrl: gsnn, //string
-    gsnnFileUrl: "data/0000000/gsnn_pred.npy", // url string
-  },
+const statusColorCode = {
+  未分析: "gray",
+  分析中: "#108ee9",
+  分析完成: "#87d068",
+  分析失败: "#ff4d4f",
 };
 
 export default {
@@ -204,25 +217,11 @@ export default {
        */
       detailModalVisible: false,
       detailModalConfirmLoading: false,
-      showDetailContent: false
+      showDetailContent: false,
     };
   },
   created() {
-    let self = this;
-
-    this.tableConfirmLoading = true;
-
-    getGraphList({
-      data: {},
-    })
-      .then((res) => {
-        self.graphLists = res.data;
-        self.getGraphListSuccess();
-      })
-      .catch(() => {
-        self.graphLists = Mocks.GraphList;
-        self.getGraphListError();
-      });
+    this.getGraphList();
   },
   methods: {
     openDetail(id) {
@@ -230,20 +229,19 @@ export default {
       self.detailModalVisible = true;
       self.detailModalConfirmLoading = true;
 
-      setTimeout(() => {
-        getGraphDetail({
-          data: { id: id },
+      getGraphDetail({
+        data: { id: id },
+      })
+        .then((res) => {
+          self.graphDetail = res.data;
+          self.getGraphDetailSuccess();
         })
-          .then((res) => {
-            self.graphDetail = res.data;
-            self.getGraphDetailSuccess();
-          })
-          .catch(() => {
-            self.graphDetail = Mocks.GraphDetail;
-            self.getGraphDetailError();
-          });
-      }, 2000)
-
+        .catch(() => {
+          self.graphDetail = Mocks.GraphList.filter(
+            (item) => item.id === id
+          )[0];
+          self.getGraphDetailError();
+        });
     },
     handleAdd() {
       this.model = null;
@@ -253,20 +251,36 @@ export default {
       let self = this;
       self.tableConfirmLoading = true;
 
-      setTimeout(() => {
-
-        deleteGraph({
-          data: { id },
+      deleteGraph({
+        data: { id },
+      })
+        .then((res) => {
+          this.graphLists = res.data;
+          self.deleteGraphSuccess();
         })
-          .then((res) => {
-            this.graphLists = res.data;
-            self.deleteGraphSuccess();
-          })
-          .catch(() => {
-            self.deleteGraphError();
-          });
+        .catch(() => {
+          self.deleteGraphError();
+        });
+    },
+    handleRefresh() {
+      this.getGraphList();
+    },
+    getGraphList() {
+      let self = this;
 
-      }, 2000)
+      this.tableConfirmLoading = true;
+
+      getGraphList({
+        data: {},
+      })
+        .then((res) => {
+          self.graphLists = res.data;
+          self.getGraphListSuccess();
+        })
+        .catch(() => {
+          self.graphLists = Mocks.GraphList;
+          self.getGraphListError();
+        });
     },
     detailModalOk() {
       this.detailModalVisible = false;
@@ -295,8 +309,7 @@ export default {
     getGraphListError() {
       this.tableConfirmLoading = false;
       this.$notification.open({
-        message: "失败！",
-        description: "获取任务列表失败！",
+        message: "获取任务列表失败！",
         icon: <a-icon type="close-circle" style="color: #f00" />,
       });
     },
@@ -311,7 +324,7 @@ export default {
       this.detailModalConfirmLoading = false;
       this.showDetailContent = true;
       this.$notification.open({
-        message: "获取任务列表失败！",
+        message: "获取任务详情失败！",
         icon: <a-icon type="close-circle" style="color: #f00" />,
       });
     },
@@ -319,23 +332,28 @@ export default {
       this.detailModalConfirmLoading = false;
       this.showDetailContent = true;
       this.$notification.open({
-        message: "获取任务列表成功！",
+        message: "获取任务详情成功！",
         icon: <a-icon type="check-circle" style="color: #87d068" />,
       });
     },
-    deleteGraphSuccess(){
+    deleteGraphSuccess() {
       this.tableConfirmLoading = false;
       this.$notification.open({
         message: "删除任务成功！",
         icon: <a-icon type="check-circle" style="color: #87d068" />,
       });
     },
-    deleteGraphError(){
+    deleteGraphError() {
       this.tableConfirmLoading = false;
       this.$notification.open({
         message: "删除任务失败！",
         icon: <a-icon type="close-circle" style="color: #f00" />,
       });
+    },
+  },
+  filters: {
+    statusColor(status) {
+      return statusColorCode[status];
     },
   },
 };
