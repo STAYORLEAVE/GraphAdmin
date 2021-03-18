@@ -3,8 +3,8 @@ import VueRouter from 'vue-router';
 
 Vue.use(VueRouter);
 
-import GraphList from '../components/graph/List.vue';
-import ModalManage from '../components/modal/Manage.vue';
+import GraphList from '../views/graph/List.vue';
+import ModalManage from '../views/modal/Manage.vue';
 
 export default new VueRouter({
   routes: [

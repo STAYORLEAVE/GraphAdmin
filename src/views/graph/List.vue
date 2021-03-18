@@ -108,8 +108,8 @@ import Origin from "../../assets/Origin.png";
 import Reshaped from "../../assets/Reshaped.png";
 
 // compoments
-import GraphAdd from "./GraphAdd.vue";
-import GraphDetail from "./GraphDetail.vue";
+import GraphAdd from "../../components/graph/GraphAdd.vue";
+import GraphDetail from "../../components/graph/GraphDetail.vue";
 
 // mock data
 
